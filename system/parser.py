@@ -41,7 +41,7 @@ def format_tool_use(tool_use: Dict[str, Any]) -> str:
 def format_tool_result(result: Dict[str, Any]) -> str:
     """
     Format tool result for Telegram.
-    Returns formatted string with first 5 lines.
+    Returns formatted string with limited content.
     """
     # Extract result content
     content = ""

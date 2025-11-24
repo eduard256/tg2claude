@@ -2,13 +2,14 @@
 
 import asyncio
 import logging
+import os
 from typing import Dict, Optional
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.enums import ParseMode
 
-from config import TG_BOT_TOKEN, ALLOWED_USERS
+from config import TG_BOT_TOKEN, ALLOWED_USERS, WORKSPACE_DIR
 from sessions import get_session, save_session, delete_session
 from parser import parse_line, extract_message_content
 from claude import run_claude
@@ -28,11 +29,52 @@ dp = Dispatcher()
 processes: Dict[int, asyncio.Task] = {}
 
 
+def generate_file_tree(directory: str, prefix: str = "", max_depth: int = 5, current_depth: int = 0) -> str:
+    """Generate compact file tree for workspace."""
+    if current_depth >= max_depth:
+        return ""
+
+    lines = []
+    try:
+        items = sorted(os.listdir(directory))
+        # Filter out hidden files and common ignored items
+        items = [item for item in items if not item.startswith('.') and item not in ['__pycache__', 'node_modules', 'venv']]
+
+        for i, item in enumerate(items):
+            path = os.path.join(directory, item)
+            is_last = i == len(items) - 1
+            current_prefix = "└── " if is_last else "├── "
+
+            if os.path.isdir(path):
+                lines.append(f"{prefix}{current_prefix}{item}/")
+                extension = "    " if is_last else "│   "
+                subtree = generate_file_tree(path, prefix + extension, max_depth, current_depth + 1)
+                if subtree:
+                    lines.append(subtree)
+            else:
+                lines.append(f"{prefix}{current_prefix}{item}")
+    except PermissionError:
+        pass
+
+    return "\n".join(lines)
+
+
 def format_user_prompt(message: types.Message) -> str:
     """Format user message with metadata for Claude."""
     user = message.from_user
 
-    user_info = f"""Информация о пользователе:
+    # Get absolute working directory path
+    workspace_path = os.path.abspath(WORKSPACE_DIR)
+
+    # Generate file tree
+    file_tree = generate_file_tree(workspace_path)
+
+    user_info = f"""Твоя рабочая директория: {workspace_path}
+
+Структура файлов:
+{file_tree}
+
+Информация о пользователе:
 - ID: {user.id}
 - Username: @{user.username if user.username else 'none'}
 - Имя: {user.full_name}
