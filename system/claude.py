@@ -29,11 +29,13 @@ async def run_claude(user_id: int, prompt: str, session_id: Optional[str] = None
     cmd.extend(["-p", prompt])
 
     # Start subprocess in workspace directory
+    # Set limit to 10MB to handle large JSON lines from Claude Code
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        cwd=WORKSPACE_DIR
+        cwd=WORKSPACE_DIR,
+        limit=10 * 1024 * 1024  # 10 MB buffer for large tool results
     )
 
     # Read stdout line by line

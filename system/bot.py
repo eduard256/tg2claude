@@ -16,8 +16,8 @@ from claude import run_claude
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -88,49 +88,72 @@ def format_user_prompt(message: types.Message) -> str:
 
 async def process_claude_stream(user_id: int, chat_id: int, prompt: str):
     """Process Claude Code stream and send messages to Telegram."""
+    logger.info(f"[USER {user_id}] Starting Claude stream processing")
+
     session = get_session(user_id)
     session_id = session.get("claude_session_id")
+    logger.info(f"[USER {user_id}] Existing session_id: {session_id}")
 
     # Lock session
     session["locked"] = True
     save_session(user_id, session)
+    logger.info(f"[USER {user_id}] Session locked")
 
     current_session_id = None
     message_buffer = []
     last_message = None
 
     try:
+        logger.info(f"[USER {user_id}] Starting subprocess for Claude")
         async for line in run_claude(user_id, prompt, session_id):
             if not line:
                 continue
 
+            logger.debug(f"[USER {user_id}] Received line from Claude: {line[:100]}...")
+
             data = parse_line(line)
             if not data:
+                logger.debug(f"[USER {user_id}] Failed to parse line")
                 continue
 
+            msg_type = data.get("type")
+            logger.info(f"[USER {user_id}] Parsed message type: {msg_type}")
+
             # Extract session_id from system messages
-            if data.get("type") == "system" and data.get("subtype") == "init":
+            if msg_type == "system" and data.get("subtype") == "init":
                 current_session_id = data.get("session_id")
                 if current_session_id:
+                    logger.info(f"[USER {user_id}] Saved Claude session: {current_session_id}")
                     session["claude_session_id"] = current_session_id
                     save_session(user_id, session)
 
             # Extract and send content
             content = extract_message_content(data)
             if content:
+                content_len = len(content)
+                logger.info(f"[USER {user_id}] Extracted content ({content_len} chars)")
+                logger.debug(f"[USER {user_id}] Content preview: {content[:200]}...")
+
                 # Send message to Telegram
                 try:
+                    logger.info(f"[USER {user_id}] Attempting to send message to Telegram...")
                     last_message = await bot.send_message(
                         chat_id,
                         content,
                         parse_mode=ParseMode.MARKDOWN
                     )
+                    logger.info(f"[USER {user_id}] Message sent successfully (msg_id={last_message.message_id})")
                 except Exception as e:
+                    logger.error(f"[USER {user_id}] Failed to send with markdown: {type(e).__name__}: {e}")
                     # Try without markdown if it fails
                     try:
+                        logger.info(f"[USER {user_id}] Retrying without markdown...")
                         last_message = await bot.send_message(chat_id, content)
-                    except:
-                        logger.error(f"Failed to send message: {e}")
+                        logger.info(f"[USER {user_id}] Message sent without markdown (msg_id={last_message.message_id})")
+                    except Exception as e2:
+                        logger.error(f"[USER {user_id}] Failed to send message completely: {type(e2).__name__}: {e2}")
+                        logger.error(f"[USER {user_id}] Content length was: {len(content)} chars")
+                        logger.error(f"[USER {user_id}] First 500 chars: {content[:500]}")
 
             # Check if result received (unlock session)
             if data.get("type") == "result":
