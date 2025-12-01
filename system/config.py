@@ -23,7 +23,7 @@ ALLOWED_USERS = {int(uid.strip()) for uid in allowed_users_str.split(",") if uid
 # Claude command configuration
 CLAUDE_MODEL = "sonnet"
 CLAUDE_BASE_CMD = [
-    "claude",
+    "/home/dev/.local/bin/claude",
     "--dangerously-skip-permissions",
     "--verbose",
     "--model", CLAUDE_MODEL,

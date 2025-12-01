@@ -1,6 +1,7 @@
 """Claude Code interaction module."""
 
 import asyncio
+import os
 import subprocess
 from typing import AsyncGenerator, Optional
 from config import WORKSPACE_DIR, CLAUDE_BASE_CMD
@@ -30,11 +31,13 @@ async def run_claude(user_id: int, prompt: str, session_id: Optional[str] = None
 
     # Start subprocess in workspace directory
     # Set limit to 10MB to handle large JSON lines from Claude Code
+    # Pass environment variables to ensure Claude Code can find MCP config
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=WORKSPACE_DIR,
+        env=os.environ.copy(),  # Pass current environment including HOME
         limit=10 * 1024 * 1024  # 10 MB buffer for large tool results
     )
 

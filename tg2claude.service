@@ -1,0 +1,15 @@
+[Unit]
+Description=Telegram to Claude Code Bot
+After=network.target
+
+[Service]
+Type=simple
+User=dev
+Environment=HOME=/home/dev
+WorkingDirectory=/home/dev/tg2claude
+ExecStart=/bin/bash /home/dev/tg2claude/start.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
